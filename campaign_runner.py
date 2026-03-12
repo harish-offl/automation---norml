@@ -8,9 +8,9 @@ from config import DELAY_BETWEEN_EMAILS
 # Django should already be configured by the time this module is imported
 
 
-def run_campaign():
-    """Send a uniquely generated cold email to each lead.
-    Pulls leads from the Django database, falls back to CSV if DB is empty.
+def run_campaign(use_csv_fallback=True):
+    """Send uniquely generated cold emails to leads.
+    Pulls leads from Django DB and optionally falls back to CSV.
     """
     from app.models import Lead
 
@@ -34,7 +34,7 @@ def run_campaign():
         print(f"Could not fetch leads from DB: {e}, falling back to CSV")
 
     # Fallback to CSV if DB is empty or unavailable
-    if not leads:
+    if not leads and use_csv_fallback:
         try:
             with open("leads.csv") as file:
                 reader = csv.DictReader(file)
@@ -43,8 +43,16 @@ def run_campaign():
         except FileNotFoundError:
             print("No leads.csv file found and no leads in database")
             return
+    elif not leads:
+        print("No leads found in database; campaign not started")
+        return
 
     for row in leads:
+        solution = (row.get("niche") or "").strip()
+        if not solution:
+            print(f"Skipped {row.get('email', 'unknown')}: missing solution/niche")
+            continue
+
         email_content = generate_cold_email(row)
 
         lines = email_content.split("\n")
