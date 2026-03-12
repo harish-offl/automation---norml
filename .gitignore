@@ -6,4 +6,17 @@ __pycache__/
 .tmp_pytest/
 pytest-cache-files-*/
 ai_generation.log
-README.md
+
+# Next.js / Node.js
+norml-app/node_modules/
+norml-app/.next/
+norml-app/.env.local
+norml-app/out/
+norml-app/build/
+norml-app/dist/
+norml-app/*.log
+norml-app/.DS_Store
+norml-app/.vercel
+
+# Package lock files (optional - keep if you want)
+# norml-app/package-lock.json
