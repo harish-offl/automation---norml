@@ -3,11 +3,9 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from env_utils import BASE_DIR, load_project_env
 
-load_dotenv()
-
-BASE_DIR = Path(__file__).resolve().parent.parent
+load_project_env()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-dev-secret-key-change-in-production")
 DEBUG = os.getenv("DEBUG", "1").lower() in {"1", "true", "yes", "on"}

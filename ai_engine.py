@@ -1,15 +1,14 @@
 import os
 import re
 import subprocess
-
-from dotenv import load_dotenv
+from env_utils import load_project_env
 
 try:
-    import requests
+    import requests  # type: ignore
 except Exception:
     requests = None
 
-load_dotenv()
+load_project_env()
 
 # name of the ollama model to use (must be installed locally or accessible via ollama)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
@@ -117,11 +116,11 @@ def _generate_with_ollama(prompt: str) -> tuple[str, str]:
             )
             return _strip_ansi(proc.stdout).strip(), ""
         except FileNotFoundError as exc:
-            errors.append(f"{' '.join(cmd[:3])}: {exc}")
+            errors.append(f"{' '.join(cmd[:3])}: {exc}")  # type: ignore
             break
         except subprocess.CalledProcessError as exc:
             stderr = _strip_ansi(exc.stderr).strip()
-            errors.append(f"{' '.join(cmd[:3])}: {stderr or str(exc)}")
+            errors.append(f"{' '.join(cmd[:3])}: {stderr or str(exc)}")  # type: ignore
 
     return "", " | ".join(errors)
 
@@ -139,7 +138,7 @@ def _normalize_email(raw_text: str, lead: dict) -> str:
     first = _ascii_safe(lines[0].strip())
     if first.lower().startswith("subject:"):
         subject = first
-        body_lines = lines[1:]
+        body_lines = lines[1:]  # type: ignore
     else:
         subject = f"Subject: Growth strategy opportunity for {solution} in {industry}"
         body_lines = lines
@@ -184,7 +183,7 @@ def _detailed_fallback(lead: dict) -> str:
         f"Best regards,\n{sender_name}\n\n"
         f"P.S. Many businesses in {industry} are already using {solution} to capture more demand. This is a strong time to stay ahead."
     )
-    body = "\n".join(fallback.splitlines()[1:])
+    body = "\n".join(fallback.splitlines()[1:])  # type: ignore
     if _word_count(body) > MAX_BODY_WORDS:
         trimmed_ps = (
             f"Subject: {solution} strategy to grow {industry} lead flow\n"
@@ -213,7 +212,7 @@ def _solution_alignment_ok(email_text: str, solution: str) -> bool:
         return False
 
     subject = lines[0].lower()
-    body = "\n".join(lines[1:]).lower()
+    body = "\n".join(lines[1:]).lower()  # type: ignore
     return expected in subject and expected in body
 
 

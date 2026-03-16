@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 import os
 import re
 import threading
@@ -15,7 +16,17 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from campaign_runner import run_campaign
+from config import get_missing_smtp_settings
+from .campaign_status import (
+    campaign_is_running,
+    fail_campaign,
+    get_campaign_status_snapshot,
+    start_campaign_tracking,
+)
 from .models import Lead
+
+
+logger = logging.getLogger(__name__)
 
 
 CSV_FIELD_ALIASES = {
@@ -51,6 +62,10 @@ def _parse_bool(value, default=True):
     if value is None:
         return default
     return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _count_pending_leads():
+    return Lead.objects.filter(sent_at__isnull=True).count()
 
 
 def _canonicalize_row(row):
@@ -96,10 +111,11 @@ class LeadViewSet(viewsets.ModelViewSet):
                 cleaned_row, ignored = _canonicalize_row(row)
                 ignored_columns.update(ignored)
 
-                email = cleaned_row.get("email")
+                email = (cleaned_row.get("email") or "").strip().lower()
                 if not email:
                     skipped += 1
                     continue
+                cleaned_row["email"] = email
                 if require_solution and not cleaned_row.get("niche"):
                     skipped += 1
                     continue
@@ -129,11 +145,19 @@ class LeadViewSet(viewsets.ModelViewSet):
                         "phone": row.get("phone", ""),
                         "company": row.get("company", ""),
                     }
-                    _, was_created = Lead.objects.update_or_create(email=row["email"], defaults=defaults)
-                    if was_created:
-                        created += 1
-                    else:
+                    lead = Lead.objects.filter(email__iexact=row["email"]).first()
+                    if lead:
+                        for field_name, field_value in defaults.items():
+                            setattr(lead, field_name, field_value)
+                        if lead.sent_at is None:
+                            lead.last_status = "pending"
+                            lead.last_error = ""
+                        lead.email = row["email"]
+                        lead.save()
                         updated += 1
+                    else:
+                        Lead.objects.create(email=row["email"], **defaults)
+                        created += 1
 
             return Response(
                 {
@@ -154,11 +178,64 @@ class LeadViewSet(viewsets.ModelViewSet):
         if not Lead.objects.exists():
             return Response({"error": "No leads found. Upload leads before starting a campaign."}, status=400)
 
+        if campaign_is_running():
+            return Response(
+                {
+                    "error": "Campaign is already running.",
+                    "campaign": get_campaign_status_snapshot(),
+                },
+                status=409,
+            )
+
+        pending_leads = _count_pending_leads()
+        if pending_leads == 0:
+            return Response(
+                {
+                    "error": (
+                        "All leads have already been emailed. Upload new leads or replace the existing leads "
+                        "to start another campaign."
+                    )
+                },
+                status=400,
+            )
+
+        missing_settings = get_missing_smtp_settings()
+        if missing_settings:
+            missing = ", ".join(missing_settings)
+            return Response(
+                {
+                    "error": (
+                        f"Missing SMTP configuration: {missing}. "
+                        "Add them to the project .env file or set them in the environment before starting a campaign."
+                    )
+                },
+                status=400,
+            )
+
+        started, campaign = start_campaign_tracking(total=pending_leads)
+        if not started:
+            return Response(
+                {
+                    "error": "Campaign is already running.",
+                    "campaign": campaign,
+                },
+                status=409,
+            )
+
         def task():
-            run_campaign(use_csv_fallback=False)
+            try:
+                run_campaign(use_csv_fallback=False, only_unsent=True)
+            except Exception as exc:
+                fail_campaign(str(exc))
+                logger.exception("Campaign thread crashed")
 
         threading.Thread(target=task, daemon=True).start()
-        return Response({"status": "campaign started"})
+        return Response({"status": "campaign started", "campaign": campaign})
+
+    @action(detail=False, methods=["get"])
+    def campaign_status(self, request):
+        """Return the latest background campaign status."""
+        return Response(get_campaign_status_snapshot())
 
 
 def frontend_view(request):
@@ -173,5 +250,6 @@ urlpatterns = [
     path("api/leads/", LeadViewSet.as_view({"get": "list", "post": "create"})),
     path("api/leads/upload/", LeadViewSet.as_view({"post": "upload"})),
     path("api/campaign/start/", LeadViewSet.as_view({"post": "start_campaign"})),
+    path("api/campaign/status/", LeadViewSet.as_view({"get": "campaign_status"})),
     path("", frontend_view),
 ]

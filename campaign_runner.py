@@ -1,10 +1,15 @@
 import concurrent.futures
 import csv
+import threading
 import time
 
 from smtp_sender import SMTPSender
 from ai_engine import generate_cold_email
-from config import DELAY_BETWEEN_EMAILS, MAX_CONCURRENT_EMAILS
+from config import DELAY_BETWEEN_EMAILS, LEAD_FETCH_CHUNK_SIZE, MAX_CONCURRENT_EMAILS
+from app.campaign_status import finish_campaign, record_campaign_progress
+
+
+_lead_update_lock = threading.Lock()
 
 # Django should already be configured by the time this module is imported
 
@@ -20,24 +25,43 @@ def _parse_email_content(email_content):
     return subject, body
 
 
-def _load_leads(use_csv_fallback=True):
+def _deduplicate_leads(leads):
+    unique_leads = []
+    seen_emails = set()
+
+    for row in leads:
+        email = (row.get("email") or "").strip().lower()
+        if not email or email in seen_emails:
+            continue
+
+        normalized_row = dict(row)
+        normalized_row["email"] = email
+        unique_leads.append(normalized_row)
+        seen_emails.add(email)
+
+    return unique_leads
+
+
+def _load_leads(use_csv_fallback=True, only_unsent=True):
     from app.models import Lead
 
     leads = []
     try:
         db_leads = Lead.objects.all()
-        if db_leads.exists():
-            leads = [
+        if only_unsent:
+            db_leads = db_leads.filter(sent_at__isnull=True)
+        db_leads = db_leads.order_by("id")
+        for lead in db_leads.iterator(chunk_size=LEAD_FETCH_CHUNK_SIZE):
+            leads.append(
                 {
                     "name": lead.name or "",
-                    "email": lead.email,
+                    "email": (lead.email or "").strip().lower(),
                     "niche": lead.niche or "",
                     "industry": lead.industry or "",
                     "phone": lead.phone or "",
                     "company": lead.company or "",
                 }
-                for lead in db_leads
-            ]
+            )
     except Exception as e:
         print(f"Could not fetch leads from DB: {e}, falling back to CSV")
 
@@ -54,7 +78,7 @@ def _load_leads(use_csv_fallback=True):
         print("No leads found in database; campaign not started")
         return
 
-    return leads
+    return _deduplicate_leads(leads)
 
 
 def _split_chunks(items, chunk_count):
@@ -65,39 +89,100 @@ def _split_chunks(items, chunk_count):
     return [chunk for chunk in chunks if chunk]
 
 
+def _update_lead_delivery(email, *, last_status, last_error="", sent=False):
+    if not email:
+        return
+
+    from django.db import close_old_connections
+    from django.utils import timezone
+    from app.models import Lead
+
+    update_fields = {
+        "last_status": last_status,
+        "last_error": (last_error or "")[:2000],
+    }
+    if sent:
+        update_fields["sent_at"] = timezone.now()
+
+    close_old_connections()
+    with _lead_update_lock:
+        Lead.objects.filter(email__iexact=email).update(**update_fields)
+
+
+def _mark_lead_sent(email):
+    _update_lead_delivery(email, last_status="sent", last_error="", sent=True)
+
+
+def _mark_lead_failed(email, error_message):
+    _update_lead_delivery(email, last_status="failed", last_error=error_message)
+
+
+def _mark_lead_skipped(email, reason):
+    _update_lead_delivery(email, last_status="skipped", last_error=reason)
+
+
 def _process_chunk(worker_id, rows):
+    from django.db import close_old_connections
+
     sent = 0
     skipped = 0
     failed = 0
+    gen_seconds = 0.0
+    send_seconds = 0.0
 
-    with SMTPSender() as sender:
-        for row in rows:
-            solution = (row.get("niche") or "").strip()
-            if not solution:
-                skipped += 1
-                print(f"[worker-{worker_id}] Skipped {row.get('email', 'unknown')}: missing solution/niche")
-                continue
+    close_old_connections()
 
-            try:
-                email_content = generate_cold_email(row)
-                subject, body = _parse_email_content(email_content)
-                sender.send(row["email"], subject, body)
-                sent += 1
-                print(f"[worker-{worker_id}] Email sent to: {row['email']}")
-            except Exception as exc:
-                failed += 1
-                print(f"[worker-{worker_id}] Failed {row.get('email', 'unknown')}: {exc}")
+    try:
+        with SMTPSender() as sender:
+            for row in rows:
+                email = (row.get("email") or "").strip().lower()
+                solution = (row.get("niche") or "").strip()
+                if not solution:
+                    skipped += 1
+                    _mark_lead_skipped(email, "Missing solution/niche")
+                    record_campaign_progress(skipped=1)
+                    print(f"[worker-{worker_id}] Skipped {email or 'unknown'}: missing solution/niche")
+                    continue
 
-            if DELAY_BETWEEN_EMAILS > 0:
-                time.sleep(DELAY_BETWEEN_EMAILS)
+                try:
+                    start_gen = time.perf_counter()
+                    email_content = generate_cold_email(row)
+                    gen_seconds += time.perf_counter() - start_gen
 
-    return sent, skipped, failed
+                    start_send = time.perf_counter()
+                    subject, body = _parse_email_content(email_content)
+                    sender.send(email, subject, body)
+                    send_seconds += time.perf_counter() - start_send
+
+                    _mark_lead_sent(email)
+                    record_campaign_progress(sent=1)
+                    sent += 1
+                    print(f"[worker-{worker_id}] Email sent to: {email}")
+                except Exception as exc:
+                    failed += 1
+                    _mark_lead_failed(email, str(exc))
+                    record_campaign_progress(failed=1)
+                    print(f"[worker-{worker_id}] Failed {email or 'unknown'}: {exc}")
+
+                if DELAY_BETWEEN_EMAILS > 0:
+                    time.sleep(DELAY_BETWEEN_EMAILS)
+    finally:
+        close_old_connections()
+
+    return {
+        "sent": sent,
+        "skipped": skipped,
+        "failed": failed,
+        "gen_seconds": gen_seconds,
+        "send_seconds": send_seconds,
+    }
 
 
-def run_campaign(use_csv_fallback=True):
+def run_campaign(use_csv_fallback=True, only_unsent=True):
     """Send generated cold emails to leads with parallel workers."""
-    leads = _load_leads(use_csv_fallback=use_csv_fallback)
+    leads = _load_leads(use_csv_fallback=use_csv_fallback, only_unsent=only_unsent)
     if not leads:
+        finish_campaign(message="Campaign finished: no pending leads to send.")
         return
 
     worker_count = max(1, min(MAX_CONCURRENT_EMAILS, len(leads)))
@@ -107,12 +192,16 @@ def run_campaign(use_csv_fallback=True):
     total_sent = 0
     total_skipped = 0
     total_failed = 0
+    total_gen_seconds = 0.0
+    total_send_seconds = 0.0
 
     if worker_count == 1:
-        sent, skipped, failed = _process_chunk(1, chunks[0])
-        total_sent += sent
-        total_skipped += skipped
-        total_failed += failed
+        result = _process_chunk(1, chunks[0])
+        total_sent += result["sent"]
+        total_skipped += result["skipped"]
+        total_failed += result["failed"]
+        total_gen_seconds += result["gen_seconds"]
+        total_send_seconds += result["send_seconds"]
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = [
@@ -120,14 +209,24 @@ def run_campaign(use_csv_fallback=True):
                 for idx, chunk in enumerate(chunks)
             ]
             for future in concurrent.futures.as_completed(futures):
-                sent, skipped, failed = future.result()
-                total_sent += sent
-                total_skipped += skipped
-                total_failed += failed
+                result = future.result()
+                total_sent += result["sent"]
+                total_skipped += result["skipped"]
+                total_failed += result["failed"]
+                total_gen_seconds += result["gen_seconds"]
+                total_send_seconds += result["send_seconds"]
 
     elapsed = max(0.001, time.perf_counter() - started_at)
     throughput = total_sent / elapsed
+    finish_campaign(
+        elapsed_seconds=elapsed,
+        message=(
+            f"Campaign finished: sent={total_sent}, skipped={total_skipped}, failed={total_failed}, "
+            f"elapsed={elapsed:.2f}s."
+        ),
+    )
     print(
         f"Campaign complete: sent={total_sent}, skipped={total_skipped}, failed={total_failed}, "
-        f"workers={worker_count}, elapsed={elapsed:.2f}s, throughput={throughput:.2f} emails/sec"
+        f"workers={worker_count}, elapsed={elapsed:.2f}s, throughput={throughput:.2f} emails/sec, "
+        f"gen_time={total_gen_seconds:.2f}s, send_time={total_send_seconds:.2f}s"
     )

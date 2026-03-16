@@ -4,10 +4,9 @@ from email.mime.text import MIMEText
 from config import (
     SMTP_SERVER,
     SMTP_PORT,
-    EMAIL_ADDRESS,
-    EMAIL_PASSWORD,
     SMTP_MAX_RETRIES,
     SMTP_RETRY_DELAY_SECONDS,
+    get_email_credentials,
 )
 
 
@@ -16,18 +15,22 @@ class SMTPSender:
 
     def __init__(self):
         self.server = None
+        self.email_address = None
 
     def connect(self):
         if self.server is not None:
             return
-        if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
+
+        email_address, email_password = get_email_credentials()
+        if not email_address or not email_password:
             raise RuntimeError("Missing EMAIL_ADDRESS or EMAIL_PASSWORD in environment.")
 
+        self.email_address = email_address
         self.server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
         self.server.ehlo()
         self.server.starttls()
         self.server.ehlo()
-        self.server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        self.server.login(email_address, email_password)
 
     def close(self):
         if self.server is None:
@@ -38,11 +41,11 @@ class SMTPSender:
             pass
         finally:
             self.server = None
+            self.email_address = None
 
     def send(self, to_email, subject, body):
         msg = MIMEText(body)
         msg["Subject"] = subject
-        msg["From"] = EMAIL_ADDRESS
         msg["To"] = to_email
 
         attempts = SMTP_MAX_RETRIES + 1
@@ -50,7 +53,11 @@ class SMTPSender:
         for attempt in range(attempts):
             try:
                 self.connect()
-                self.server.sendmail(EMAIL_ADDRESS, to_email, msg.as_string())
+                if "From" in msg:
+                    msg.replace_header("From", self.email_address)
+                else:
+                    msg["From"] = self.email_address
+                self.server.sendmail(self.email_address, to_email, msg.as_string())
                 return
             except Exception as exc:
                 last_error = exc

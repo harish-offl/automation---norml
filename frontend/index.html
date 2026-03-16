@@ -13,10 +13,41 @@
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 
   <script>
-    const { useState } = React;
+    const { useEffect, useState } = React;
+    const POLL_INTERVAL_MS = 2000;
+
+    function formatCampaignMessage(campaign) {
+      if (!campaign) return '';
+      if (campaign.message) return campaign.message;
+      return `Campaign ${campaign.status}`;
+    }
+
     function App() {
       const [file, setFile] = useState(null);
       const [message, setMessage] = useState('');
+      const [campaign, setCampaign] = useState(null);
+
+      const loadCampaignStatus = async () => {
+        try {
+          const res = await axios.get('/api/campaign/status/');
+          setCampaign(res.data);
+        } catch (err) {
+          // Keep the last visible state if polling fails briefly.
+        }
+      };
+
+      useEffect(() => {
+        loadCampaignStatus();
+      }, []);
+
+      useEffect(() => {
+        if (campaign?.status !== 'running') {
+          return undefined;
+        }
+
+        const timer = setInterval(loadCampaignStatus, POLL_INTERVAL_MS);
+        return () => clearInterval(timer);
+      }, [campaign?.status]);
 
       const upload = async () => {
         if (!file) return;
@@ -35,20 +66,33 @@
 
       const start = async () => {
         try {
+          setMessage('');
           const res = await axios.post('/api/campaign/start/');
-          setMessage(res.data.status);
+          setCampaign(res.data.campaign || null);
+          setMessage(formatCampaignMessage(res.data.campaign) || res.data.status);
         } catch (err) {
           const detail = err?.response?.data?.error || err.message || 'Failed to start campaign';
           setMessage(`Start failed: ${detail}`);
+          if (err?.response?.data?.campaign) {
+            setCampaign(err.response.data.campaign);
+          }
         }
       };
+
+      const isCampaignRunning = campaign?.status === 'running';
 
       return React.createElement('div', null,
         React.createElement('h1', null, 'Email Automation Dashboard'),
         React.createElement('input', { type: 'file', onChange: e => setFile(e.target.files[0]) }),
         React.createElement('button', { onClick: upload }, 'Upload Leads'),
-        React.createElement('button', { onClick: start }, 'Start Campaign'),
-        React.createElement('p', null, message)
+        React.createElement('button', { onClick: start, disabled: isCampaignRunning }, isCampaignRunning ? 'Campaign Running...' : 'Start Campaign'),
+        React.createElement('p', null, message),
+        campaign && React.createElement('div', null,
+          React.createElement('p', null, `Status: ${campaign.status}`),
+          React.createElement('p', null, `Progress: ${campaign.processed}/${campaign.total}`),
+          React.createElement('p', null, `Sent: ${campaign.sent} | Skipped: ${campaign.skipped} | Failed: ${campaign.failed}`),
+          React.createElement('p', null, formatCampaignMessage(campaign))
+        )
       );
     }
 

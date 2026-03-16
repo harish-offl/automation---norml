@@ -4,6 +4,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .tmp_pytest/
+/.tmp_pytest_local/
+test_temp_local/
 pytest-cache-files-*/
 ai_generation.log
 
