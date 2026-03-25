@@ -283,19 +283,43 @@
     // ── upload & send ──
     async function upload(){
       if(!S.file){setNotice("error","Choose a file first.");return}
-      E.uploadBtn.disabled=true;E.uploadBtn.textContent="Sending…";
-      setNotice("info","Uploading and sending emails — this may take a moment…");
-      const fd=new FormData();fd.append("file",S.file);
+      E.uploadBtn.disabled=true;E.uploadBtn.textContent="Parsing…";
+      setNotice("info","Step 1/2 — Parsing file…");
+
       try{
-        const r=await fetch("/api/upload-leads",{method:"POST",body:fd});
-        const d=await r.json();
-        if(!r.ok)throw new Error(d.error||"Upload failed");
-        S.lastResult=d;
-        S.leads=d.leads||[];
-        setNotice("success",`Done! Sent: ${d.sent}, Skipped: ${d.skipped}, Failed: ${d.failed}`);
-        renderSummary(d);renderLeads();renderStats(d);
-        setView("monitorPanel");
-        renderMonitor(d);
+        // Step 1: upload & parse file
+        const fd=new FormData();fd.append("file",S.file);
+        const r1=await fetch("/api/upload-leads",{method:"POST",body:fd});
+        const d1=await r1.json();
+        if(!r1.ok)throw new Error(d1.error||"Upload failed");
+        if(!d1.leads||!d1.leads.length)throw new Error("No valid leads found in file.");
+
+        S.leads=d1.leads;
+        setNotice("info",`Step 2/2 — Sending emails to ${d1.leads.length} leads…`);
+        E.uploadBtn.textContent="Sending…";
+
+        // Step 2: send emails
+        const r2=await fetch("/api/send-emails",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({leads:d1.leads})
+        });
+        const d2=await r2.json();
+        if(!r2.ok)throw new Error(d2.error||"Email sending failed");
+
+        // Step 3: update campaign status
+        await fetch("/api/campaign-status",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({total:d2.total,sent:d2.sent,failed:d2.failed,skipped:d2.skipped})
+        });
+
+        // Update leads with send status
+        S.leads=d2.results||d1.leads;
+        S.lastResult=d2;
+        setNotice("success",`Done! Sent: ${d2.sent} ✓  Skipped: ${d2.skipped}  Failed: ${d2.failed}`);
+        renderSummary(d2);renderLeads();renderStats(d2);
+        setView("monitorPanel");renderMonitor(d2);
       }catch(e){
         setNotice("error",e.message||"Upload failed.");
       }finally{
