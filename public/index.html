@@ -427,6 +427,7 @@
         jumpUpload:$("jumpUpload"),jumpMonitor:$("jumpMonitor")
       });
       bind();renderNotice();renderFile();renderButtons();renderChecks();applyActiveView();
+      setNotice("info","Ready — upload a CSV to begin.");
       if(E.topChips)E.topChips.innerHTML=`<span class="chip"><strong>Status</strong> idle</span><span class="chip"><strong>Leads</strong> 0</span>`;
     }
     document.addEventListener("DOMContentLoaded",init);
