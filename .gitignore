@@ -10,6 +10,13 @@ pytest-cache-files-*/
 ai_generation.log
 data/*.db
 
+# Python entry files — keep local only, never push (prevents Vercel FastAPI detection)
+main.py
+manage.py
+requirements.txt
+*.py
+backend/
+
 # Next.js / Node.js
 norml-app/node_modules/
 norml-app/.next/
