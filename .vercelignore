@@ -1,0 +1,12 @@
+backend/
+*.py
+requirements.txt
+manage.py
+main.py
+leads.db
+leads.db-shm
+leads.db-wal
+frontend/
+data/
+node_modules/
+.env

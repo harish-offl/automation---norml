@@ -1,14 +1,6 @@
 {
   "version": 2,
-  "functions": {
-    "api/upload-leads.js":    { "runtime": "nodejs24.x" },
-    "api/send-emails.js":     { "runtime": "nodejs24.x" },
-    "api/campaign-status.js": { "runtime": "nodejs24.x" }
-  },
   "rewrites": [
-    { "source": "/api/upload-leads",    "destination": "/api/upload-leads.js" },
-    { "source": "/api/send-emails",     "destination": "/api/send-emails.js" },
-    { "source": "/api/campaign-status", "destination": "/api/campaign-status.js" },
-    { "source": "/((?!api/).*)",        "destination": "/public/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/public/index.html" }
   ]
 }

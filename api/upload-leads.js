@@ -3,8 +3,6 @@ const formidable = require("formidable");
 const XLSX       = require("xlsx");
 const fs         = require("fs");
 
-module.exports.config = { api: { bodyParser: false } };
-
 function parseForm(req) {
   return new Promise((resolve, reject) => {
     const form = formidable({ multiples: false, keepExtensions: true, maxFileSize: 10 * 1024 * 1024 });
@@ -20,7 +18,7 @@ function normalizeKey(obj, ...keys) {
   return null;
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -53,4 +51,7 @@ module.exports = async function handler(req, res) {
   } finally {
     if (tmpPath && fs.existsSync(tmpPath)) { try { fs.unlinkSync(tmpPath); } catch (_) {} }
   }
-};
+}
+
+handler.config = { api: { bodyParser: false } };
+module.exports = handler;
