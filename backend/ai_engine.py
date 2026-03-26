@@ -144,57 +144,95 @@ def _generate_with_ollama(prompt: str) -> tuple[str, str]:
 
 def _format_email(text: str, sender_name: str) -> str:
     """
-    Auto-fix formatter — enforces:
-    - Vertical bullet points (never inline)
+    Post-processor: cleans and normalizes every email before sending.
+    Rules:
+    - Remove standalone brand name at top
+    - Keep only one greeting (Hi ...,)
+    - Vertical bullet points
     - Blank lines between paragraphs
-    - Two-line signature: 'Best regards,\\n{name}'
-    - Clean spacing throughout
+    - Two-line signature
+    - Remove incomplete footer text
+    - Clean P.S. spacing
     """
     if not text:
         return text
 
-    # 1. Fix inline bullets: "- A - B - C" → separate lines
-    # Split lines that contain multiple "- " patterns into individual lines
-    fixed_lines = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        # Detect inline bullets: line has 2+ occurrences of " - " pattern
-        if stripped.count(" - ") >= 1 and stripped.startswith("- "):
-            parts = re.split(r"\s{1,3}-\s", stripped)
-            for i, part in enumerate(parts):
-                part = part.strip()
-                if part:
-                    fixed_lines.append(f"- {part}" if i > 0 else f"- {part.lstrip('- ')}")
+    lines = text.splitlines()
+
+    # 1. Remove standalone brand/agency name at top (first non-empty line
+    #    that is just a company name with no comma or sentence structure)
+    cleaned = []
+    skipped_brand = False
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if not skipped_brand and s and not s.lower().startswith("subject:") \
+                and not s.lower().startswith("hi ") and not s.lower().startswith("dear ") \
+                and "," not in s and len(s.split()) <= 4 and i < 4:
+            skipped_brand = True
+            continue
+        cleaned.append(line)
+    lines = cleaned
+
+    # 2. Remove duplicate greeting — keep only "Hi ...", drop "Dear ...,"
+    hi_seen = False
+    filtered = []
+    for line in lines:
+        s = line.strip().lower()
+        if s.startswith("hi ") and "," in s:
+            if not hi_seen:
+                hi_seen = True
+                filtered.append(line)
+            # skip duplicates
+        elif s.startswith("dear ") and "," in s:
+            pass  # always remove Dear line
         else:
-            fixed_lines.append(line)
+            filtered.append(line)
+    lines = filtered
 
-    text = "\n".join(fixed_lines)
+    text = "\n".join(lines)
 
-    # 2. Fix signature: "Best regards, Name" or "Best regards,Name" → two lines
+    # 3. Fix inline bullets: "- A - B - C" on one line → separate lines
+    result_lines = []
+    for line in text.splitlines():
+        s = line.strip()
+        # Count bullet markers in line
+        if s.startswith("- ") and s.count(" - ") >= 1:
+            parts = re.split(r"\s{1,3}-\s", s)
+            for i, part in enumerate(parts):
+                part = part.strip().lstrip("- ").strip()
+                if part:
+                    result_lines.append(f"- {part}")
+        else:
+            result_lines.append(line)
+    text = "\n".join(result_lines)
+
+    # 4. Fix signature: "Best regards, Name" or "Best regards,Name" → two lines
     text = re.sub(
-        r"Best regards,\s*" + re.escape(sender_name),
-        f"Best regards,\n{sender_name}",
-        text,
-        flags=re.IGNORECASE,
-    )
-    # Also fix generic "Best regards, <anything>" on one line
-    text = re.sub(
-        r"(Best regards,)\s+([A-Z][a-zA-Z ]+)$",
-        r"\1\n\2",
+        r"(Best regards),\s*(.+)$",
+        r"\1,\n\2",
         text,
         flags=re.MULTILINE,
     )
 
-    # 3. Ensure blank line before bullet blocks
+    # 5. Ensure blank line before bullet block
     text = re.sub(r"([^\n])\n(- )", r"\1\n\n\2", text)
 
-    # 4. Ensure blank line after bullet blocks
-    text = re.sub(r"(- [^\n]+)\n([^-\n])", r"\1\n\n\2", text)
+    # 6. Ensure blank line after bullet block
+    text = re.sub(r"(^- [^\n]+)(\n)([^-\n])", r"\1\n\n\3", text, flags=re.MULTILINE)
 
-    # 5. Ensure blank line before "Best regards"
+    # 7. Ensure blank line before "Best regards"
     text = re.sub(r"([^\n])\n(Best regards)", r"\1\n\n\2", text, flags=re.IGNORECASE)
 
-    # 6. Collapse 3+ blank lines into 2
+    # 8. Ensure blank line before P.S.
+    text = re.sub(r"([^\n])\n(P\.S\.)", r"\1\n\n\2", text)
+
+    # 9. Remove incomplete footer text (unsubscribe boilerplate cut off mid-sentence)
+    text = re.sub(
+        r"\n+You received this email because.*$", "", text,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+
+    # 10. Collapse 3+ blank lines → max 2
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()

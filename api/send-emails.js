@@ -20,14 +20,16 @@ I came across ${company || "your company"} and wanted to reach out regarding ${n
 
 At ${agency}, we specialise in helping businesses like yours grow through targeted email outreach and automation — saving time while generating consistent leads.
 
+- Increased qualified website traffic and online visibility
+- Improved lead generation from digital channels
+- Stronger brand authority in the local market
+
 Would you be open to a quick 15-minute call this week to explore if there's a fit?
 
 Best regards,
 ${sender}
-${agency}
 
----
-To unsubscribe, reply with "unsubscribe".`;
+P.S. Many businesses are already using outreach automation to stay ahead — this is a strong time to act.`;
 }
 
 function htmlBody(name, company, niche, agency, sender) {
@@ -39,19 +41,24 @@ function htmlBody(name, company, niche, agency, sender) {
     <tr><td align="center" style="padding:40px 20px">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
         <tr><td style="padding:0 0 24px 0;border-bottom:1px solid #e5e7eb">
-          <span style="font-size:13px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">${agency}</span>
+          <span style="font-size:12px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">${agency}</span>
         </td></tr>
-        <tr><td style="padding:32px 0 0 0">
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827">Hi <strong>${name}</strong>,</p>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151">I came across <strong>${company || "your company"}</strong> and wanted to reach out regarding <strong>${niche || "your services"}</strong>.</p>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151">At <strong>${agency}</strong>, we specialise in helping businesses like yours grow through targeted email outreach and automation — saving time while generating consistent leads.</p>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151">Would you be open to a quick 15-minute call this week to explore if there's a fit?</p>
-          <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#374151">Best regards,</p>
-          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#111827">${sender}</p>
-          <p style="margin:0;font-size:14px;color:#6b7280">${agency}</p>
+        <tr><td style="padding:28px 0 0 0">
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111827">Hi <strong>${name}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">I came across <strong>${company || "your company"}</strong> and wanted to reach out regarding <strong>${niche || "your services"}</strong>.</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">At <strong>${agency}</strong>, we specialise in helping businesses like yours grow through targeted email outreach and automation — saving time while generating consistent leads.</p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 16px">
+            <tr><td style="padding:4px 0;font-size:15px;line-height:1.7;color:#374151">&#8212;&nbsp;Increased qualified website traffic and online visibility</td></tr>
+            <tr><td style="padding:4px 0;font-size:15px;line-height:1.7;color:#374151">&#8212;&nbsp;Improved lead generation from digital channels</td></tr>
+            <tr><td style="padding:4px 0;font-size:15px;line-height:1.7;color:#374151">&#8212;&nbsp;Stronger brand authority in the local market</td></tr>
+          </table>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#374151">Would you be open to a quick 15-minute call this week to explore if there's a fit?</p>
+          <p style="margin:0 0 2px;font-size:15px;color:#374151">Best regards,</p>
+          <p style="margin:0 0 20px;font-size:15px;font-weight:700;color:#111827">${sender}</p>
+          <p style="margin:0;font-size:13px;color:#6b7280;font-style:italic">P.S. Many businesses are already using outreach automation to stay ahead — this is a strong time to act.</p>
         </td></tr>
-        <tr><td style="padding:32px 0 0 0;border-top:1px solid #e5e7eb;margin-top:32px">
-          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5">You received this email because your business was identified as a potential fit for our services. To unsubscribe, simply reply with "unsubscribe".</p>
+        <tr><td style="padding:24px 0 0 0;border-top:1px solid #e5e7eb">
+          <p style="margin:0;font-size:11px;color:#9ca3af">To unsubscribe, reply with "unsubscribe".</p>
         </td></tr>
       </table>
     </td></tr>
