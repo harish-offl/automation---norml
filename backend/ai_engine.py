@@ -40,51 +40,43 @@ def _lead_value(lead: dict, key: str, default: str) -> str:
 
 
 def _build_prompt(lead: dict) -> str:
-    name = _lead_value(lead, "name", "there")
-    company = _lead_value(lead, "company", "your business")
-    solution = _lead_value(lead, "niche", "digital growth")
-    industry = _lead_value(lead, "industry", "your industry")
+    name        = _lead_value(lead, "name",     "there")
+    company     = _lead_value(lead, "company",  "your business")
+    solution    = _lead_value(lead, "niche",    "digital growth")
+    industry    = _lead_value(lead, "industry", "your industry")
     sender_name = DEFAULT_SENDER_NAME
     agency_name = DEFAULT_COMPANY_NAME
 
     return (
-        "Write one professional B2B cold email using this EXACT structure and formatting.\n\n"
-        f"Recipient Name: {name}\n"
-        f"Client Company: {company}\n"
-        f"Solution We Provide: {solution}\n"
-        f"Industry: {industry}\n\n"
-        "STRICT FORMATTING RULES:\n"
-        "1) First line: Subject: <subject text>\n"
-        "2) Blank line\n"
-        f"3) Hi {name},\n"
-        "4) Blank line\n"
-        "5) One sentence: respectful opening recognizing their work in the industry.\n"
-        "6) Blank line\n"
-        "7) One sentence: problem context about competition and changing buyer behavior.\n"
-        "8) Blank line\n"
-        f"9) One sentence: introduce {agency_name} and the service '{solution}'.\n"
-        "10) Blank line\n"
-        "11) Three bullet points, each on its OWN LINE starting with '- ':\n"
-        "- Benefit one\n"
-        "- Benefit two\n"
-        "- Benefit three\n"
-        "12) Blank line\n"
-        "13) One sentence CTA: invite a 15-minute call.\n"
-        "14) Blank line\n"
-        "15) Exactly:\n"
-        "Best regards,\n"
-        f"{sender_name}\n"
-        "16) Blank line\n"
-        f"17) P.S. One sentence about urgency for {industry} businesses.\n\n"
-        "RULES:\n"
-        "- Bullet points MUST be on separate lines, never inline\n"
-        "- Signature MUST be two lines: 'Best regards,' then name on next line\n"
-        "- One blank line between every paragraph\n"
-        "- Plain text only, no markdown, no emoji, no tables\n"
-        f"- Use the phrase '{solution}' at least once in subject and once in body\n"
-        "- Keep body under 150 words\n"
-        "- Do not combine bullet points into one line"
+        "Write one professional B2B cold email. "
+        "Fill in the placeholders below and output ONLY the final email — no explanations.\n\n"
+        "Use this EXACT template, replacing every {{placeholder}}:\n\n"
+        f"Subject: {{Service}} strategy for {{CompanyName}} | {solution} for {industry}\n\n"
+        f"Hi {name},\n\n"
+        f"As a professional in the {industry} sector, you understand how important it is "
+        "to stay ahead of competitors and maintain consistent growth.\n\n"
+        f"With competition increasing and buyer behavior shifting online, many {industry} "
+        "businesses are finding it difficult to generate qualified leads and maintain strong visibility.\n\n"
+        f"At {agency_name}, we help {industry} businesses grow through {solution} "
+        "tailored to their target audience and market demand.\n\n"
+        "Here's what you can expect:\n\n"
+        "- Increased qualified website traffic and online visibility\n"
+        "- Improved lead generation from digital channels\n"
+        "- Stronger brand authority in your market\n\n"
+        f"Would you be open to a quick 15-minute call to explore how {solution} "
+        f"can help {company} attract more clients?\n\n"
+        f"Best regards,\n{sender_name}\n\n"
+        "STRICT RULES — you must follow these exactly:\n"
+        "1. Output plain text only. No markdown, no HTML, no emoji.\n"
+        "2. First line must be: Subject: <text>\n"
+        "3. Keep the three bullet points on separate lines starting with '- '\n"
+        "4. Signature must be two lines: 'Best regards,' then the name on the next line\n"
+        "5. One blank line between every paragraph\n"
+        "6. Do NOT add 'Dear', 'P.S.', or any extra sections\n"
+        "7. Do NOT change the structure — only personalise the content\n"
+        "8. Keep body under 150 words"
     )
+
 
 
 def _generate_with_ollama(prompt: str) -> tuple[str, str]:
@@ -287,44 +279,34 @@ def _normalize_email(raw_text: str, lead: dict) -> str:
 
 
 def _detailed_fallback(lead: dict) -> str:
-    """Template fallback used when Ollama output is invalid."""
-    name = _lead_value(lead, "name", "there")
-    company = _lead_value(lead, "company", "your business")
-    solution = _lead_value(lead, "niche", "growth")
-    industry = _lead_value(lead, "industry", "your industry")
+    """Guaranteed-format fallback using the exact approved template."""
+    name        = _lead_value(lead, "name",     "there")
+    company     = _lead_value(lead, "company",  "your business")
+    solution    = _lead_value(lead, "niche",    "digital growth")
+    industry    = _lead_value(lead, "industry", "your industry")
     sender_name = DEFAULT_SENDER_NAME
     agency_name = DEFAULT_COMPANY_NAME
 
-    fallback = (
-        f"Subject: {solution} strategy to grow {industry} lead flow\n\n"
+    email = (
+        f"Subject: {solution} strategy for {company}\n\n"
         f"Hi {name},\n\n"
-        f"As a professional in the {industry} sector, you know how important it is to stay ahead of competitors and maintain steady growth.\n\n"
-        f"With competition increasing and buyer behavior shifting online, many {industry} businesses find it difficult to generate consistent qualified leads and maintain visibility.\n\n"
-        f"At {agency_name}, we help {industry} businesses improve online growth through {solution} tailored to their market and customer intent.\n\n"
+        f"As a professional in the {industry} sector, you understand how important it is "
+        "to stay ahead of competitors and maintain consistent growth.\n\n"
+        f"With competition increasing and buyer behavior shifting online, many {industry} "
+        "businesses are finding it difficult to generate qualified leads and maintain strong visibility.\n\n"
+        f"At {agency_name}, we help {industry} businesses grow through {solution} "
+        "tailored to their target audience and market demand.\n\n"
+        "Here's what you can expect:\n\n"
         "- Increased qualified website traffic and online visibility\n"
         "- Improved lead generation from digital channels\n"
-        "- Stronger brand authority in the local market\n\n"
-        f"Would you be open to a quick 15-minute call to explore how {solution} can help {company} attract more clients?\n\n"
-        f"Best regards,\n{sender_name}\n\n"
-        f"P.S. Many businesses in {industry} are already using {solution} to capture more demand. This is a strong time to stay ahead."
+        "- Stronger brand authority in your market\n\n"
+        f"Would you be open to a quick 15-minute call to explore how {solution} "
+        f"can help {company} attract more clients?\n\n"
+        f"Best regards,\n{sender_name}"
     )
 
-    body = "\n".join(fallback.splitlines()[1:])
-    if _word_count(body) > MAX_BODY_WORDS:
-        fallback = (
-            f"Subject: {solution} strategy to grow {industry} lead flow\n\n"
-            f"Hi {name},\n\n"
-            f"As a professional in the {industry} sector, you know steady growth depends on staying visible while competitors move fast.\n\n"
-            f"Many {industry} businesses now struggle with rising competition, shifting buyer behavior, and inconsistent digital lead flow.\n\n"
-            f"At {agency_name}, we help businesses like {company} grow through {solution} with focused execution.\n\n"
-            "- Increased qualified traffic and visibility\n"
-            "- Better lead generation from digital channels\n"
-            "- Stronger brand authority in your local market\n\n"
-            f"Would you be open to a quick 15-minute call to explore how {solution} can help {company} grow?\n\n"
-            f"Best regards,\n{sender_name}"
-        )
+    return _ascii_safe(email)
 
-    return _format_email(_ascii_safe(fallback), sender_name)
 
 
 def _solution_alignment_ok(email_text: str, solution: str) -> bool:
@@ -349,20 +331,16 @@ def _structure_alignment_ok(email_text: str, name: str, industry: str) -> bool:
     lines = [line.strip().lower() for line in email_text.splitlines() if line.strip()]
     if len(lines) < 6:
         return False
-
     lowered = "\n".join(lines)
-    expected_hi = f"hi {name.lower()}".strip()
-    if expected_hi not in lowered:
+    if f"hi {name.lower()}," not in lowered:
         return False
     if "best regards" not in lowered:
         return False
     if "15-minute call" not in lowered:
         return False
-    if industry.lower() not in lowered:
-        return False
-
-    bullet_lines = [line for line in lines if line.startswith("- ")]
+    bullet_lines = [l for l in lines if l.startswith("- ")]
     return len(bullet_lines) >= 2
+
 
 
 def _log_result(result: str, error: str) -> None:
