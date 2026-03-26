@@ -2,11 +2,11 @@
 const nodemailer = require("nodemailer");
 
 function buildTransporter() {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
-  if (!user || !pass) throw new Error("EMAIL_USER or EMAIL_PASS not set in Vercel environment variables.");
+  const user = process.env.EMAIL_USER || process.env.EMAIL_ADDRESS;
+  const pass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD;
+  if (!user || !pass) throw new Error("Email credentials not set. Add EMAIL_USER and EMAIL_PASS in Vercel environment variables.");
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || "smtp.gmail.com",
+    host:   process.env.SMTP_HOST || process.env.SMTP_SERVER || "smtp.gmail.com",
     port:   Number(process.env.SMTP_PORT) || 587,
     secure: false,
     auth:   { user, pass },
@@ -42,9 +42,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: "No leads provided. Pass { leads: [...] } in the request body." });
   }
 
-  const senderName = process.env.SENDER_NAME || "NORML Agency";
-  const agencyName = process.env.AGENCY_NAME || "NORML Agency";
-  const fromAddr   = process.env.EMAIL_USER;
+  const senderName = process.env.SENDER_NAME || "Annamalai";
+  const agencyName = process.env.AGENCY_NAME || "Arrise Digital";
+  const fromAddr   = process.env.EMAIL_USER  || process.env.EMAIL_ADDRESS;
 
   let transporter;
   try { transporter = buildTransporter(); }
