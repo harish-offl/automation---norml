@@ -144,98 +144,111 @@ def _generate_with_ollama(prompt: str) -> tuple[str, str]:
 
 def _format_email(text: str, sender_name: str) -> str:
     """
-    Post-processor: cleans and normalizes every email before sending.
-    Rules:
-    - Remove standalone brand name at top
-    - Keep only one greeting (Hi ...,)
-    - Vertical bullet points
-    - Blank lines between paragraphs
-    - Two-line signature
-    - Remove incomplete footer text
-    - Clean P.S. spacing
+    Post-processor: cleans, restructures and normalises every email.
+    Rules applied:
+    - Remove standalone brand/company line at top
+    - Keep only one greeting (Hi ...,) — drop Dear
+    - Vertical bullet points, never inline
+    - Blank line between every paragraph
+    - Two-line signature: Best regards,\\n{name}
+    - Remove incomplete footer/unsubscribe text
+    - P.S. on its own paragraph
     """
     if not text:
         return text
 
     lines = text.splitlines()
 
-    # 1. Remove standalone brand/agency name at top (first non-empty line
-    #    that is just a company name with no comma or sentence structure)
+    # ── 1. Separate subject from body ──────────────────────────────────────
+    subject_line = ""
+    body_lines = lines
+    if lines and lines[0].strip().lower().startswith("subject:"):
+        subject_line = lines[0].strip()
+        body_lines = lines[1:]
+
+    # ── 2. Remove leading blank lines ──────────────────────────────────────
+    while body_lines and not body_lines[0].strip():
+        body_lines = body_lines[1:]
+
+    # ── 3. Remove standalone brand/company line at top ─────────────────────
+    agency = DEFAULT_COMPANY_NAME.strip().lower()
+    if body_lines and body_lines[0].strip().lower() == agency:
+        body_lines = body_lines[1:]
+    while body_lines and not body_lines[0].strip():
+        body_lines = body_lines[1:]
+
+    # ── 4. Remove duplicate greeting — keep only "Hi ..., " ────────────────
+    greeting_seen = False
     cleaned = []
-    skipped_brand = False
-    for i, line in enumerate(lines):
-        s = line.strip()
-        if not skipped_brand and s and not s.lower().startswith("subject:") \
-                and not s.lower().startswith("hi ") and not s.lower().startswith("dear ") \
-                and "," not in s and len(s.split()) <= 4 and i < 4:
-            skipped_brand = True
-            continue
-        cleaned.append(line)
-    lines = cleaned
-
-    # 2. Remove duplicate greeting — keep only "Hi ...", drop "Dear ...,"
-    hi_seen = False
-    filtered = []
-    for line in lines:
+    for line in body_lines:
         s = line.strip().lower()
-        if s.startswith("hi ") and "," in s:
-            if not hi_seen:
-                hi_seen = True
-                filtered.append(line)
-            # skip duplicates
-        elif s.startswith("dear ") and "," in s:
-            pass  # always remove Dear line
+        is_hi   = s.startswith("hi ") and s.endswith(",")
+        is_dear = s.startswith("dear ") and s.endswith(",")
+        if is_hi or is_dear:
+            if not greeting_seen:
+                if is_dear:
+                    name_part = line.strip()[5:].rstrip(",").strip()
+                    cleaned.append(f"Hi {name_part},")
+                else:
+                    cleaned.append(line.strip())
+                greeting_seen = True
+            # skip any subsequent greeting line
         else:
-            filtered.append(line)
-    lines = filtered
+            cleaned.append(line)
+    body_lines = cleaned
 
-    text = "\n".join(lines)
-
-    # 3. Fix inline bullets: "- A - B - C" on one line → separate lines
-    result_lines = []
-    for line in text.splitlines():
-        s = line.strip()
-        # Count bullet markers in line
-        if s.startswith("- ") and s.count(" - ") >= 1:
-            parts = re.split(r"\s{1,3}-\s", s)
+    # ── 5. Fix inline bullets ───────────────────────────────────────────────
+    expanded = []
+    for line in body_lines:
+        stripped = line.strip()
+        if stripped.startswith("- ") and re.search(r"\s-\s", stripped[2:]):
+            parts = re.split(r"\s+-\s+", stripped)
             for i, part in enumerate(parts):
                 part = part.strip().lstrip("- ").strip()
                 if part:
-                    result_lines.append(f"- {part}")
+                    expanded.append(f"- {part}")
         else:
-            result_lines.append(line)
-    text = "\n".join(result_lines)
+            expanded.append(line)
+    body_lines = expanded
 
-    # 4. Fix signature: "Best regards, Name" or "Best regards,Name" → two lines
-    text = re.sub(
-        r"(Best regards),\s*(.+)$",
+    # ── 6. Rejoin and fix signature on one line ────────────────────────────
+    rejoined = "\n".join(body_lines)
+    rejoined = re.sub(
+        r"(Best regards),\s+([A-Za-z][^\n]+)",
         r"\1,\n\2",
-        text,
-        flags=re.MULTILINE,
+        rejoined,
+        flags=re.IGNORECASE,
     )
 
-    # 5. Ensure blank line before bullet block
-    text = re.sub(r"([^\n])\n(- )", r"\1\n\n\2", text)
-
-    # 6. Ensure blank line after bullet block
-    text = re.sub(r"(^- [^\n]+)(\n)([^-\n])", r"\1\n\n\3", text, flags=re.MULTILINE)
-
-    # 7. Ensure blank line before "Best regards"
-    text = re.sub(r"([^\n])\n(Best regards)", r"\1\n\n\2", text, flags=re.IGNORECASE)
-
-    # 8. Ensure blank line before P.S.
-    text = re.sub(r"([^\n])\n(P\.S\.)", r"\1\n\n\2", text)
-
-    # 9. Remove incomplete footer text (unsubscribe boilerplate cut off mid-sentence)
-    text = re.sub(
-        r"\n+You received this email because.*$", "", text,
-        flags=re.IGNORECASE | re.DOTALL
+    # ── 7. Remove incomplete footer / unsubscribe text ─────────────────────
+    rejoined = re.sub(
+        r"\n+You received this email because.*$", "",
+        rejoined, flags=re.IGNORECASE | re.DOTALL
+    )
+    rejoined = re.sub(
+        r"\n+To unsubscribe.*$", "",
+        rejoined, flags=re.IGNORECASE | re.DOTALL
     )
 
-    # 10. Collapse 3+ blank lines → max 2
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    # ── 8. Ensure blank line before bullets ────────────────────────────────
+    rejoined = re.sub(r"([^\n])\n(- )", r"\1\n\n\2", rejoined)
 
-    return text.strip()
+    # ── 9. Ensure blank line after bullet block ────────────────────────────
+    rejoined = re.sub(r"(^- [^\n]+)(\n)([^-\n])", r"\1\n\n\3", rejoined, flags=re.MULTILINE)
+
+    # ── 10. Ensure blank line before "Best regards" ────────────────────────
+    rejoined = re.sub(r"([^\n])\n(Best regards)", r"\1\n\n\2", rejoined, flags=re.IGNORECASE)
+
+    # ── 11. Ensure blank line before P.S. ─────────────────────────────────
+    rejoined = re.sub(r"([^\n])\n(P\.S\.)", r"\1\n\n\2", rejoined, flags=re.IGNORECASE)
+
+    # ── 12. Collapse 3+ blank lines → 2 ───────────────────────────────────
+    rejoined = re.sub(r"\n{3,}", "\n\n", rejoined)
+
+    # ── 13. Reassemble with subject ───────────────────────────────────────
+    final = f"{subject_line}\n\n{rejoined.strip()}" if subject_line else rejoined.strip()
+    return final.strip()
+
 
 
 def _normalize_email(raw_text: str, lead: dict) -> str:
