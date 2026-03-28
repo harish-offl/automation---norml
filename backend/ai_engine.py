@@ -250,9 +250,10 @@ def _format_email(text: str, sender_name: str) -> str:
 
 
 def _normalize_email(raw_text: str, lead: dict) -> str:
-    name = _lead_value(lead, "name", "there")
-    solution = _lead_value(lead, "niche", "digital growth")
+    name     = _lead_value(lead, "name",     "there")
+    solution = _lead_value(lead, "niche",    "digital growth")
     industry = _lead_value(lead, "industry", "your industry")
+
     lines = [line.rstrip() for line in (raw_text or "").splitlines()]
     lines = [line for line in lines if line.strip()]
 
@@ -261,27 +262,48 @@ def _normalize_email(raw_text: str, lead: dict) -> str:
 
     first = _ascii_safe(lines[0].strip())
     if first.lower().startswith("subject:"):
-        subject = first
-        body_lines = lines[1:]  # type: ignore
+        subject   = first
+        body_lines = lines[1:]
     else:
-        subject = f"Subject: Growth strategy opportunity for {solution} in {industry}"
+        subject    = f"Subject: {solution} growth strategy for {_lead_value(lead, 'company', 'your business')}"
         body_lines = lines
 
     if not body_lines:
         return _detailed_fallback(lead)
 
     body = _ascii_safe("\n".join(body_lines).strip())
+
+    # Word count gate
     body_word_count = _word_count(body)
     if body_word_count < MIN_BODY_WORDS or body_word_count > MAX_BODY_WORDS:
         return _detailed_fallback(lead)
 
     final_text = _ascii_safe(f"{subject}\n{body}")
+
+    # Must contain solution phrase
     if not _solution_alignment_ok(final_text, solution):
         return _detailed_fallback(lead)
+
+    # Must pass structure check
     if not _structure_alignment_ok(final_text, name, industry):
         return _detailed_fallback(lead)
 
+    # CRITICAL: reject if bullets are inline (all on one line separated by spaces)
+    # A valid email must have at least 3 lines that each start with "- "
+    bullet_lines = [l for l in body_lines if l.strip().startswith("- ")]
+    if len(bullet_lines) < 3:
+        return _detailed_fallback(lead)
+
+    # Reject if "Dear" appears (old format)
+    if any(l.strip().lower().startswith("dear ") for l in body_lines):
+        return _detailed_fallback(lead)
+
+    # Reject if "Here's what you can expect" appears (old format)
+    if any("here's what you can expect" in l.lower() for l in body_lines):
+        return _detailed_fallback(lead)
+
     return _format_email(final_text, DEFAULT_SENDER_NAME)
+
 
 
 def _detailed_fallback(lead: dict) -> str:
