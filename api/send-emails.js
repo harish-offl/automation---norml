@@ -88,33 +88,68 @@ function buildTextBody(lead) {
 function buildHtmlBody(lead) {
   const { name = "there", company = "your business", niche = "digital growth", industry = "your industry" } = lead;
   const esc = s => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#fff;font-family:Arial,Helvetica,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 20px">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-<tr><td style="padding:0 0 20px;border-bottom:1px solid #e5e7eb">
-  <span style="font-size:12px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">${esc(AGENCY_NAME)}</span>
-</td></tr>
-<tr><td style="padding:28px 0 0">
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111">Hi <strong>${esc(name)}</strong>,</p>
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">As a professional in the <strong>${esc(industry)}</strong> sector, you know how important it is to stay ahead of competitors and maintain steady growth.</p>
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">With competition increasing and buyer behavior shifting online, many <strong>${esc(industry)}</strong> businesses find it difficult to generate consistent qualified leads and maintain visibility.</p>
-  <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">At <strong>${esc(AGENCY_NAME)}</strong>, we help <strong>${esc(industry)}</strong> businesses improve online growth through <strong>${esc(niche)}</strong> tailored to their market and customer intent.</p>
-  <p style="margin:0 0 8px;font-size:15px;line-height:1.7;color:#374151">Here's what you can expect:</p>
-  <table cellpadding="0" cellspacing="0" style="margin:0 0 16px">
-    <tr><td style="padding:3px 0;font-size:15px;color:#374151">&#8212;&nbsp;Increased qualified website traffic and online visibility</td></tr>
-    <tr><td style="padding:3px 0;font-size:15px;color:#374151">&#8212;&nbsp;Improved lead generation from digital channels</td></tr>
-    <tr><td style="padding:3px 0;font-size:15px;color:#374151">&#8212;&nbsp;Stronger brand authority in the local market</td></tr>
-  </table>
-  <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#374151">Would you be open to a quick 15-minute call to explore how <strong>${esc(niche)}</strong> can help <strong>${esc(company)}</strong> attract more clients?</p>
-  <p style="margin:0 0 2px;font-size:15px;color:#374151">Best regards,</p>
-  <p style="margin:0 0 20px;font-size:15px;font-weight:700;color:#111">${esc(SENDER_NAME)}</p>
-  <p style="margin:0 0 0;font-size:13px;color:#6b7280;font-style:italic">P.S. Many businesses in ${esc(industry)} are already using ${esc(niche)} to capture more demand. This is a strong time to stay ahead.</p>
-</td></tr>
-<tr><td style="padding:20px 0 0;border-top:1px solid #e5e7eb">
-  <p style="margin:0;font-size:11px;color:#9ca3af">To unsubscribe, reply with "unsubscribe".</p>
-</td></tr>
-</table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#222222">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff">
+  <tr><td align="center" style="padding:40px 20px">
+    <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
+
+      <tr><td style="padding:0 0 20px 0;border-bottom:2px solid #ff6a00">
+        <span style="font-size:13px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">${esc(AGENCY_NAME)}</span>
+      </td></tr>
+
+      <tr><td style="padding:28px 0 0 0">
+
+        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;color:#222222">
+          Hi <strong>${esc(name)}</strong>,
+        </p>
+
+        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;color:#374151">
+          As a professional in the <strong>${esc(industry)}</strong> sector, you know how important it is to stay ahead of competitors and maintain steady growth.
+        </p>
+
+        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;color:#374151">
+          With competition increasing and buyer behavior shifting online, many <strong>${esc(industry)}</strong> businesses find it difficult to generate consistent qualified leads and maintain visibility.
+        </p>
+
+        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;color:#374151">
+          At <strong>${esc(AGENCY_NAME)}</strong>, we help <strong>${esc(industry)}</strong> businesses improve online growth through <strong>${esc(niche)}</strong> tailored to their market and customer intent.
+        </p>
+
+        <ul style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:2;color:#374151">
+          <li>Increased qualified website traffic and online visibility</li>
+          <li>Improved lead generation from digital channels</li>
+          <li>Stronger brand authority in the local market</li>
+        </ul>
+
+        <p style="margin:0 0 24px 0;font-size:15px;line-height:1.7;color:#374151">
+          Would you be open to a quick 15-minute call to explore how <strong>${esc(niche)}</strong> can help <strong>${esc(company)}</strong> attract more clients?
+        </p>
+
+        <p style="margin:0 0 4px 0;font-size:15px;color:#374151">Best regards,</p>
+        <p style="margin:0 0 20px 0;font-size:15px;font-weight:700;color:#222222">${esc(SENDER_NAME)}</p>
+
+        <p style="margin:0 0 0 0;font-size:13px;color:#6b7280;font-style:italic">
+          P.S. Many businesses in ${esc(industry)} are already using ${esc(niche)} to capture more demand. This is a strong time to stay ahead.
+        </p>
+
+      </td></tr>
+
+      <tr><td style="padding:24px 0 0 0;border-top:1px solid #e5e7eb;margin-top:24px">
+        <p style="margin:0;font-size:11px;color:#9ca3af;line-height:1.6">
+          You received this email because your business was identified as a potential fit for our services.<br>
+          To unsubscribe, reply with "unsubscribe".
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
 }
 
 // ── Retry helper ─────────────────────────────────────────────────────────────

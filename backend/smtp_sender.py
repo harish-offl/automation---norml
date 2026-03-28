@@ -13,35 +13,73 @@ from backend.config import (
 
 
 def build_html_email(subject, plain_body, sender_name, agency_name):
-    """Wrap plain text body in a clean professional white HTML email."""
-    paragraphs = "".join(
-        f'<p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151">{p.strip()}</p>'
-        for p in plain_body.strip().split("\n\n") if p.strip()
-    )
+    """Convert plain text email (with '- ' bullets) into proper HTML with <ul><li> tags."""
+    sections = []
+    bullet_buffer = []
+
+    for line in plain_body.strip().split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            bullet_buffer.append(stripped[2:])
+        else:
+            # Flush bullet buffer first
+            if bullet_buffer:
+                items = "".join(f"<li>{b}</li>" for b in bullet_buffer)
+                sections.append(
+                    f'<ul style="margin:0 0 16px 0;padding-left:20px;'
+                    f'font-size:15px;line-height:2;color:#374151">{items}</ul>'
+                )
+                bullet_buffer = []
+            if not stripped:
+                continue
+            if stripped.lower().startswith("best regards"):
+                sections.append(
+                    f'<p style="margin:0 0 4px 0;font-size:15px;color:#374151">Best regards,</p>'
+                    f'<p style="margin:0 0 20px 0;font-size:15px;font-weight:700;color:#222222">{sender_name}</p>'
+                )
+            elif stripped.lower().startswith("p.s."):
+                sections.append(
+                    f'<p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;font-style:italic">{stripped}</p>'
+                )
+            else:
+                sections.append(
+                    f'<p style="margin:0 0 16px 0;font-size:15px;line-height:1.7;color:#374151">{stripped}</p>'
+                )
+
+    if bullet_buffer:
+        items = "".join(f"<li>{b}</li>" for b in bullet_buffer)
+        sections.append(
+            f'<ul style="margin:0 0 16px 0;padding-left:20px;'
+            f'font-size:15px;line-height:2;color:#374151">{items}</ul>'
+        )
+
+    body_html = "\n        ".join(sections)
+
     return f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
-    <tr><td align="center" style="padding:40px 20px">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-        <tr><td style="padding:0 0 20px 0;border-bottom:1px solid #e5e7eb">
-          <span style="font-size:12px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">{agency_name}</span>
-        </td></tr>
-        <tr><td style="padding:28px 0 0 0">
-          {paragraphs}
-        </td></tr>
-        <tr><td style="padding:28px 0 0 0;border-top:1px solid #e5e7eb;margin-top:28px">
-          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5">
-            You received this email because your business was identified as a potential fit.<br>
-            To unsubscribe, reply with "unsubscribe".
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#222222">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff">
+  <tr><td align="center" style="padding:40px 20px">
+    <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
+      <tr><td style="padding:0 0 20px 0;border-bottom:2px solid #ff6a00">
+        <span style="font-size:13px;font-weight:700;color:#ff6a00;letter-spacing:1px;text-transform:uppercase">{agency_name}</span>
+      </td></tr>
+      <tr><td style="padding:28px 0 0 0">
+        {body_html}
+      </td></tr>
+      <tr><td style="padding:24px 0 0 0;border-top:1px solid #e5e7eb">
+        <p style="margin:0;font-size:11px;color:#9ca3af;line-height:1.6">
+          You received this email because your business was identified as a potential fit.<br>
+          To unsubscribe, reply with "unsubscribe".
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 </body>
 </html>"""
+
 
 
 class SMTPSender:
